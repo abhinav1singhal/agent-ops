@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+      - FIRESTORE_EMULATOR_HOST=firestore:8080
+    volumes:
+      - ./backend:/app
+      # Mount credentials if available, or rely on emulator
+      # - ./credentials.json:/app/credentials.json
+
+  firestore:
+    image: google/cloud-sdk:latest
+    command: gcloud beta emulators firestore start --host-port=0.0.0.0:8080
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  agent-sidecar:
+    build:
+      context: ./sidecar
+      dockerfile: Dockerfile
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - AGENT_ID=agent-demo-01
+      - SERVICE_NAME=demo-service
+      - HEARTBEAT_INTERVAL=5
+    depends_on:
+      - backend

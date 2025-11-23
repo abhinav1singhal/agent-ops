@@ -1,0 +1,52 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant UI as Dashboard
+    participant API as Backend API
+    participant DB as Firestore
+    participant Sidecar
+    participant Agent as AI Agent
+    participant GCP as GCP Control Plane
+
+    %% 1. Telemetry Loop
+    rect rgb(240, 248, 255)
+        Note over Sidecar, Agent: 1. Telemetry Loop (Every 5s)
+        loop Continuous Monitoring
+            Sidecar->>Agent: Health Check (HTTP/Process)
+            Agent-->>Sidecar: Status OK
+            Sidecar->>API: POST /telemetry (Metrics, Status)
+            API->>DB: Update Agent State
+        end
+    end
+
+    %% 2. Fault Injection
+    rect rgb(255, 245, 235)
+        Note over User, Sidecar: 2. Fault Injection Flow
+        User->>UI: Click "Inject Latency"
+        UI->>API: POST /inject-fault {type: latency}
+        API->>DB: Update Agent Config (active_faults)
+        DB-->>API: Acknowledge
+        
+        par Real-time Update
+            DB-->>UI: Stream Update (Fault Pending)
+        and Sidecar Polling
+            Sidecar->>API: Poll Config / Listen Stream
+            API-->>Sidecar: New Config (Fault: Latency)
+            Sidecar->>Sidecar: Apply Latency Logic
+        end
+    end
+
+    %% 3. Self-Healing
+    rect rgb(235, 255, 235)
+        Note over API, GCP: 3. Self-Healing Flow
+        alt Agent Unhealthy
+            Sidecar->>API: Report Error / Timeout
+            API->>DB: Update Status: UNHEALTHY
+            DB-->>UI: Alert User
+            
+            API->>GCP: Trigger Service Restart
+            GCP->>Agent: Restart Container
+            Agent-->>Sidecar: Reset
+            Sidecar->>API: Report Status: HEALTHY
+        end
+    end

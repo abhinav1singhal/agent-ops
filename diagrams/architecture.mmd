@@ -1,0 +1,49 @@
+graph TD
+    %% Styling
+    classDef gcp fill:#e8f0fe,stroke:#4285f4,stroke-width:2px;
+    classDef user fill:#fff,stroke:#333,stroke-width:2px;
+    classDef agent fill:#e6f4ea,stroke:#34a853,stroke-width:2px;
+    classDef db fill:#fce8e6,stroke:#ea4335,stroke-width:2px;
+
+    subgraph User_Layer ["User Layer"]
+        User[User / Operator]:::user
+    end
+
+    subgraph GCP_Infrastructure [Google Cloud Platform]
+        direction TB
+        
+        subgraph Cloud_Run_Services ["Cloud Run Services"]
+            Dashboard["AgentOps Dashboard\n(Next.js)"]:::gcp
+            Backend["AgentOps Platform\n(FastAPI)"]:::gcp
+        end
+        
+        subgraph Data_Layer ["Data Layer"]
+            Firestore[("Google Firestore\nReal-time DB")]:::db
+        end
+        
+        subgraph Managed_Agents ["Managed AI Agents (Cloud Run)"]
+            subgraph Agent_Instance ["Agent Pod / Container"]
+                Sidecar[AgentOps Sidecar]:::agent
+                Agent[AI Agent Core]:::agent
+            end
+        end
+        
+        GCP_API["GCP Control Plane\n(Cloud Run Admin API)"]:::gcp
+    end
+
+    %% Interactions
+    User -->|1. View Health / Inject Fault| Dashboard
+    Dashboard -->|2. API Calls| Backend
+    Backend <-->|3. Read/Write State| Firestore
+    
+    %% Telemetry
+    Sidecar -->|4. Push Telemetry| Backend
+    Sidecar -->|5. Health Check| Agent
+    
+    %% Fault Injection & Control
+    Backend -.->|6. Polls/Stream Config| Sidecar
+    Backend -->|7. Restart Service| GCP_API
+    GCP_API -->|8. Manage Lifecycle| Agent_Instance
+
+    %% Legend or Notes
+    linkStyle 0,1,2,3,4,5,6,7 stroke:#333,stroke-width:1px;
