@@ -14,43 +14,54 @@ The system consists of three main components:
 
 ```mermaid
 graph TD
-    subgraph "User Space"
-        User[User / Operator]
+    %% Styling
+    classDef gcp fill:#e8f0fe,stroke:#4285f4,stroke-width:2px;
+    classDef user fill:#fff,stroke:#333,stroke-width:2px;
+    classDef agent fill:#e6f4ea,stroke:#34a853,stroke-width:2px;
+    classDef db fill:#fce8e6,stroke:#ea4335,stroke-width:2px;
+
+    subgraph User_Layer ["User Layer"]
+        User[User / Operator]:::user
     end
 
-    subgraph "AgentOps Platform (GCP Project)"
-        UI[AgentOps Dashboard\n(Next.js on Cloud Run)]
-        API[AgentOps Backend API\n(FastAPI on Cloud Run)]
-        DB[(Firestore\nReal-time DB)]
-    end
-
-    subgraph "Managed AI Agents (Cloud Run / GKE)"
-        subgraph "Agent Instance 1"
-            A1[AI Agent Core]
-            S1[AgentOps Sidecar]
+    subgraph GCP_Infrastructure [Google Cloud Platform]
+        direction TB
+        
+        subgraph Cloud_Run_Services ["Cloud Run Services"]
+            Dashboard["AgentOps Dashboard\n(Next.js)"]:::gcp
+            Backend["AgentOps Platform\n(FastAPI)"]:::gcp
         end
-        subgraph "Agent Instance 2"
-            A2[AI Agent Core]
-            S2[AgentOps Sidecar]
+        
+        subgraph Data_Layer ["Data Layer"]
+            Firestore[("Google Firestore\nReal-time DB")]:::db
         end
+        
+        subgraph Managed_Agents ["Managed AI Agents (Cloud Run)"]
+            subgraph Agent_Instance ["Agent Pod / Container"]
+                Sidecar[AgentOps Sidecar]:::agent
+                Agent[AI Agent Core]:::agent
+            end
+        end
+        
+        GCP_API["GCP Control Plane\n(Cloud Run Admin API)"]:::gcp
     end
 
-    %% Flows
-    User -->|View Health / Inject Fault| UI
-    UI -->|API Calls| API
-    API <-->|Read/Write State| DB
+    %% Interactions
+    User -->|1. View Health / Inject Fault| Dashboard
+    Dashboard -->|2. API Calls| Backend
+    Backend <-->|3. Read/Write State| Firestore
     
-    %% Telemetry Flow
-    S1 -->|Push Telemetry / Heartbeat| API
-    S2 -->|Push Telemetry / Heartbeat| API
+    %% Telemetry
+    Sidecar -->|4. Push Telemetry| Backend
+    Sidecar -->|5. Health Check| Agent
     
-    %% Control Flow (Faults/Recovery)
-    API -.->|GCP API / Signal| S1
-    API -.->|GCP API / Signal| S2
-    API -->|Manage Lifecycle| GCP_Control[GCP Control Plane\n(Cloud Run Admin API)]
+    %% Fault Injection & Control
+    Backend -.->|6. Polls/Stream Config| Sidecar
+    Backend -->|7. Restart Service| GCP_API
+    GCP_API -->|8. Manage Lifecycle| Agent_Instance
 
-    %% Sidecar Interaction
-    A1 <-->|Localhost / Shared Vol| S1
+    %% Legend or Notes
+    linkStyle 0,1,2,3,4,5,6,7 stroke:#333,stroke-width:1px;
 ```
 
 ## 3. Component Design
